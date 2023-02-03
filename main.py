@@ -1,52 +1,76 @@
 import matplotlib.pyplot as plt
 import numpy as np
-import time
+import matplotlib.animation as animation
 
-# Set the number of stars in the simulation
-n_stars = 100
 
-# Set the initial positions and velocities of the stars
-x = np.random.uniform(-2, 2, size=n_stars)
-y = np.random.uniform(-2, 2, size=n_stars)
-vx = np.random.uniform(-0.1, 0.1, size=n_stars)
-vy = np.random.uniform(-0.1, 0.1, size=n_stars)
+def initial_conditions(N, L):
+    x = np.random.uniform(-L, L, N)
+    y = np.random.uniform(-L, L, N)
+    return x, y
 
-# Set the mass of the central black hole
-mass_bh = 1e6
+def initial_velocities(x, y, v0):
+    n = len(x)
+    vx = np.zeros(n)
+    vy = np.zeros(n)
+    for i in range(n):
+        r = np.sqrt(x[i]**2 + y[i]**2)
+        vx[i] = -v0 * y[i] / (r+1e-10)
+        vy[i] = v0 * x[i] / (r+1e-10)
+    return vx, vy
 
-# Set the time step for the simulation
+
+
+def acceleration(x, y, M):
+    G = 6.674e-11 # gravitational constant
+    n = len(x) # number of stars
+    ax = np.zeros(n) # x-component of acceleration
+    ay = np.zeros(n) # y-component of acceleration
+    for i in range(n):
+        for j in range(i + 1, n):
+            dx = x[j] - x[i]
+            dy = y[j] - y[i]
+            r = np.sqrt(dx**2 + dy**2)
+            f = G * M[i] * M[j] / r**2
+            ax[i] += f * dx / r
+            ay[i] += f * dy / r
+            ax[j] -= f * dx / r
+            ay[j] -= f * dy / r
+    return ax, ay
+
+
+def simulate_galaxy(x, y, vx, vy, dt, steps):
+    for i in range(steps):
+        ax, ay = acceleration(x, y, M)
+        vx += ax * dt
+        vy += ay * dt
+        x += vx * dt
+        y += vy * dt
+    return x, y
+
+def update(frame, x, y, vx, vy, dt, steps, scat):
+    x, y = simulate_galaxy(x, y, vx, vy, dt, steps)
+    scat.set_offsets(np.c_[x, y])
+    return scat,
+
+
+N = 10 # number of stars
+M = 1 # masses of stars
+x0 = np.random.uniform(-1, 1, N) # initial x positions of stars
+y0 = np.random.uniform(-1, 1, N) # initial y positions of stars
+vx0 = np.zeros(N) # initial x velocities of stars
+vy0 = np.zeros(N) # initial y velocities of stars
+
+
+steps = 1000
 dt = 0.01
+x, y = initial_conditions(N, 10)
+vx, vy = initial_velocities(vx0, vy0, 100)
 
-# Set the number of time steps for the simulation
-n_steps = 100
+fig, ax = plt.subplots()
+scat = ax.scatter(x, y)
+ax.axis("equal")
+ax.set_xlim(-2000, 2000)
+ax.set_ylim(-2000, 2000)
 
-# Set the softening length for the simulation
-softening = 0.1
-
-# Simulate the motion of the stars over time
-for i in range(n_steps):
-    # Calculate the gravitational acceleration from the central black hole
-    r = np.sqrt(x ** 2 + y ** 2)
-    ax = -x * mass_bh / (r ** 3 + softening ** 3)
-    ay = -y * mass_bh / (r ** 3 + softening ** 3)
-
-    # Update the velocity of the stars
-    vx = vx + ax * dt
-    vy = vy + ay * dt
-
-    # Update the position of the stars
-    x = x + vx * dt
-    y = y + vy * dt
-
-# Plot the final positions of the stars
-
-
-for i in range(n_steps):
-    # ...
-    plt.clf()
-    plt.scatter(x, y, s=100)
-    plt.xlim(-10000, 10000)
-    plt.ylim(-10000, 10000)
-    plt.pause(0.001)
-    time.sleep(0.01)
-    plt.show()
+ani = animation.FuncAnimation(fig, update, fargs=(x, y, vx, vy, dt, steps, scat), frames=1000, blit=True)
+plt.show()
